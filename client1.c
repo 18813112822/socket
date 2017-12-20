@@ -8,14 +8,134 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+
 #define MAX_BUF 4096
 #define SERVER_PORT 12138
 
+
 struct user
 {
+    int typ;
     char name[32];
     char pwd[32];
 };
+
+int regist(char* username, char* password)
+{
+    char recvBuf[MAX_BUF];
+    struct user use;
+    use.typ = 1;
+    use.name = username;
+    use.pwd = password;
+    if(send(sockfd,(char *)&use,sizeof(struct user),0)==-1)
+    {
+        perror("fail to send datas.");
+        exit(-1);
+    }
+
+    if(recv(sockfd,recvBuf,MAX_BUF,0)==-1)
+    {
+        perror("fail to receive datas.");
+        exit(-1);
+    }
+    //printf("Server:%s\n",recvBuf);
+    if(strcmp(recvBuf,"no")==0)
+    {
+        perror("密码或者用户名错误");
+        return -1;
+    }
+    return 0;
+}
+
+
+
+int login(char* username, char* password)
+{
+    
+    char recvBuf[MAX_BUF];
+    struct user use;
+    use.typ = 2;
+    use.name = username;
+    use.pwd = password;
+    if(send(sockfd,(char *)&use,sizeof(struct user),0)==-1)
+    {
+        perror("fail to send datas.");
+        exit(-1);
+    }
+
+    if(recv(sockfd,recvBuf,MAX_BUF,0)==-1)
+    {
+        perror("fail to receive datas.");
+        exit(-1);
+    }
+    //printf("Server:%s\n",recvBuf);
+    if(strcmp(recvBuf,"no")==0)
+    {
+        perror("密码或者用户名错误");
+        return -1;
+    }
+    return 0;
+}
+
+void chatroom()
+{
+
+    //发送用户名和密码过去
+    if(send(sockfd,(char *)&use,sizeof(struct user),0)==-1)
+    {
+        perror("fail to send datas.");
+        exit(-1);
+    }
+    if((recvSize=recv(sockfd,recvBuf,MAX_BUF,0)==-1))
+    {
+        perror("fail to receive datas.");
+        exit(-1);
+    }
+    //printf("Server:%s\n",recvBuf);
+    if(strcmp(recvBuf,"no")==0)
+    {
+        perror("密码或者用户名错误");
+        exit(-1);
+    }
+
+
+    //send-recv
+    if((pid=fork())<0)
+    {
+        perror("fork error\n");
+    }
+    else if(pid==0)/*child*/
+    {
+        while(1)
+        {
+	    printf("%s:",use.name);
+            fgets(sendBuf,MAX_BUF,stdin);
+            if(send(sockfd,sendBuf,strlen(sendBuf),0)==-1)
+            {
+                perror("fail to receive datas.");
+            }
+           
+	    memset(sendBuf,0,sizeof(sendBuf));
+        }
+    }
+    else
+    {
+        while(1)
+        {
+            if((recvSize=recv(sockfd,recvBuf,MAX_BUF,0)==-1))
+            {
+                printf("Server maybe shutdown!");
+                break;
+            }
+            printf("others:%s\n",recvBuf);
+	    
+            memset(recvBuf,0,sizeof(recvBuf));
+        }
+       // kill(pid,SIGKILL);
+    }
+
+    close(sockfd);
+}
 
 int main(int argc,char *argv[])
 {
@@ -24,20 +144,20 @@ int main(int argc,char *argv[])
     int sendSize,recvSize;//用于记录记录发送和接收到数据的大小
     struct hostent * host;
     struct sockaddr_in servAddr;
-    char username[32];
+    
     char * p;
     int pid;
     struct user use;
 
-    if(argc != 4)
+    if(argc != 2)
     {
-        perror("use: ./client [hostname] [username] [password]");
+        perror("use: ./client [hostname]");
         exit(-1);
     }
-    strcpy(use.name,argv[2]);
-    strcpy(use.pwd,argv[3]);
-    printf("username:%s\n",use.name);
-    printf("password:%s\n",use.pwd);
+    //strcpy(use.name,argv[2]);
+    //strcpy(use.pwd,argv[3]);
+    //printf("username:%s\n",use.name);
+    //printf("password:%s\n",use.pwd);
     host=gethostbyname(argv[1]);
     
     if(host==NULL)
@@ -69,62 +189,49 @@ int main(int argc,char *argv[])
     }
     printf("Success to connect the socket...\n");
 
-    //发送用户名和密码过去
-    if(send(sockfd,(char *)&use,sizeof(struct user),0)==-1)
-    {
-        perror("fail to send datas.");
-        exit(-1);
-    }
-    if((recvSize=recv(sockfd,recvBuf,MAX_BUF,0)==-1))
-    {
-        perror("fail to receive datas.");
-        exit(-1);
-    }
-    //printf("Server:%s\n",recvBuf);
-    if(strcmp(recvBuf,"no")==0)
-    {
-        perror("密码或者用户名错误");
-        exit(-1);
-    }
 
-
-    //send-recv
-    if((pid=fork())<0)
+    while(1)
     {
-        perror("fork error\n");
-    }
-    else if(pid==0)/*child*/
-    {
-        while(1)
+	int nn = 1;
+ 	printf("1.register\n");
+	printf("2.login\n");
+	printf("3.exit\n");
+	printf("input:");
+	scanf("%d",&nn);
+	if(nn == 1)
         {
-	    printf("%s:",username);
-            fgets(sendBuf,MAX_BUF,stdin);
-            if(send(sockfd,sendBuf,strlen(sendBuf),0)==-1)
-            {
-                perror("fail to receive datas.");
-            }
-           
-	    memset(sendBuf,0,sizeof(sendBuf));
-        }
-    }
-    else
-    {
-        while(1)
-        {
-            if((recvSize=recv(sockfd,recvBuf,MAX_BUF,0)==-1))
-            {
-                printf("Server maybe shutdown!");
-                break;
-            }
-            printf("others:%s\n",recvBuf);
+	    printf("input username:");
+	    scanf("%s",use.name);
+	    printf("input password:");
+	    scanf("%s",use.pwd);
+	    if(regist(use.name, use.pwd) == 0)
+	    {
+		printf("register success!\n");
+	    }
+	    else
+	    {
+	        printf("register failed!\n");
+	    }
 	    
-            memset(recvBuf,0,sizeof(recvBuf));
+	}
+	else if(nn == 2)
+        {
+	    printf("input username:");
+	    scanf("%s",use.name);
+	    printf("input password:");
+	    scanf("%s",use.pwd);
+	    if(login(use.name, use.pwd) == 0)
+	    {
+	   	printf("login success!\n");
+		chatroom();
+ 	    }
+	    else
+	    {
+	    	printf("register failed!\n");
+	    }
         }
-       // kill(pid,SIGKILL);
+	else
+	    break;
     }
-
-    close(sockfd);
-    
-
     return 0;
 }

@@ -12,11 +12,17 @@
 #include <sys/select.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <mysql.h>
 
 #define SERVER_PORT 12138
 #define BACKLOG 20
 #define MAX_CON_NO 10
 #define MAX_DATA_SIZE 4096
+
+#define HOST "localhost"
+#define USERNAME "root"
+#define PASSWORD "2015lzm"
+#define DATABASE "users"
 
 int MAX(int a,int b)
 {
@@ -24,8 +30,165 @@ int MAX(int a,int b)
     return b;
 }
 
+int regist(char* username, char* password)
+{
+    MYSQL conn;
+    int res;
+    char sql[100]="insert into uap values('";
+    strcat(sql, username);
+    strcat(sql, "','");
+    strcat(sql, password);
+    strcat(sql, "');");
+    mysql_init(&conn);
+
+    if(mysql_real_connect(&conn,HOST,USERNAME,PASSWORD,DATABASE,0,NULL,CLIENT_FOUND_ROWS))
+    {
+        //printf("Connect Success!\n");
+        res=mysql_query(&conn,sql);
+        if(res)
+        {
+            printf("Insert Error!\n");
+        }
+        else
+        {
+            //printf("Insert Success!\n");
+        }
+    }
+    else
+    {
+        printf("Connect Failed!\n");
+        return -1;
+    }
+    return 0;
+}
+
+int query(char* username)
+{
+    MYSQL conn;
+    MYSQL_RES *res_ptr;//指向查询结果的指针
+    MYSQL_FIELD *field;//字段结构体指针
+    MYSQL_ROW result_row;//按行返回的查询信息
+
+    int res;
+    int i;
+    int row,column;//查询返回的行数和列数
+    char *sql="select * from uap;";
+    mysql_init(&conn);
+
+
+    if(mysql_real_connect(&conn,HOST,USERNAME,PASSWORD,DATABASE,0,NULL,CLIENT_FOUND_ROWS))
+    {
+        //printf("Connect Success!\n");
+        res=mysql_query(&conn,sql);
+        //res=0表示查询成功
+        if(res)
+        {
+            printf("Select Error!\n");
+        }
+        else
+        {
+           // printf("Select Success!\n");
+            //将查询的结果给res_ptr
+            res_ptr=mysql_store_result(&conn);
+            //如果结果不为空，就可以输出了
+            if(res_ptr)//可以用这个的真假来判断用户名密码是否正确
+            {
+                //有结果了
+                column=mysql_num_fields(res_ptr);//获取列数
+                row=mysql_num_rows(res_ptr)+1;//加1是因为第一行是字段名
+               
+                //按行输出结果
+                for(i=1;i<row;i++)
+                {
+                    result_row=mysql_fetch_row(res_ptr);
+                    if(strcmp(result_row[0], username) == 0)
+		    {
+			mysql_close(&conn);
+			return -1;
+  		    }
+                }
+            }
+            else
+            {
+                //没有结果
+                printf("没有查询到匹配的数据。");
+            }
+        }
+    }
+    else
+    {
+        printf("Connect Failed!\n");
+        return -1;
+    }
+    mysql_close(&conn);
+    return 0;
+}
+
+int login(char* username, char* password)
+{
+    MYSQL conn;
+    MYSQL_RES *res_ptr;//指向查询结果的指针
+    MYSQL_FIELD *field;//字段结构体指针
+    MYSQL_ROW result_row;//按行返回的查询信息
+
+    int res;
+    int i;
+    int row,column;//查询返回的行数和列数
+    char *sql="select * from uap;";
+    mysql_init(&conn);
+
+
+    if(mysql_real_connect(&conn,HOST,USERNAME,PASSWORD,DATABASE,0,NULL,CLIENT_FOUND_ROWS))
+    {
+        //printf("Connect Success!\n");
+        res=mysql_query(&conn,sql);
+        //res=0表示查询成功
+        if(res)
+        {
+            printf("Select Error!\n");
+        }
+        else
+        {
+           // printf("Select Success!\n");
+            //将查询的结果给res_ptr
+            res_ptr=mysql_store_result(&conn);
+            //如果结果不为空，就可以输出了
+            if(res_ptr)//可以用这个的真假来判断用户名密码是否正确
+            {
+                //有结果了
+                column=mysql_num_fields(res_ptr);//获取列数
+                row=mysql_num_rows(res_ptr)+1;//加1是因为第一行是字段名
+               
+                //按行输出结果
+                for(i=1;i<row;i++)
+                {
+                    result_row=mysql_fetch_row(res_ptr);
+                    if(strcmp(result_row[0], username) == 0 && strcmp(result_row[1], password) == 0)
+		    {
+ 			mysql_close(&conn);
+			return 0;
+  		    }
+                }
+            }
+            else
+            {
+                //没有结果
+                printf("没有查询到匹配的数据。");
+            }
+        }
+    }
+    else
+    {
+        printf("Connect Failed!\n");
+        return -1;
+    }
+    mysql_close(&conn);
+    return -1;
+}
+
 struct user
 {
+    int seq;
     char name[32];
     char pwd[32];
 };
@@ -128,26 +291,43 @@ int main(int argc,char *argv[])
                     }
                     printf("Success to accpet a connection request...\n");
                     printf(">>>>>> %s:%d join in! ID(fd):%d \n",inet_ntoa(clientSockaddr.sin_addr),ntohs(clientSockaddr.sin_port),clientfd);
+
                     if((recvSize=recv(clientfd,(char *)&use,sizeof(struct user),0))==-1 || recvSize==0)
                     {
                         perror("fail to receive datas");
                     }
-                    printf("客户端发来的用户名是:%s,密码:%s\n",use.name,use.pwd);
-                    memset(recvBuf,0,sizeof(recvBuf));
-                    if(strcmp(use.name,"admin")==0 || strcmp(use.pwd,"admin")==0)
+                    
+                    memset(sendBuf,0,sizeof(sendBuf));
+                    if(use.typ==1)
                     {
-                        printf("验证成功！\n");
-                        strcpy(sendBuf,"yes");
-                    }
-                    else
-                    {
-                        printf("验证失败！\n");
-                        strcpy(sendBuf,"no");
-                    }
-                    if((sendSize=send(clientfd,sendBuf,MAX_DATA_SIZE,0))==-1)
-                    {
-                        perror("fail to receive datas");
-                    }
+                       if(query(use.name) == 0)
+			{
+			   if(regist(use.name, use.pwd) == 0);
+				sendBuf = "yes";
+			   else
+				sendBuf = "no";
+			}			
+			else
+			   sendBuf = "no";
+			if((sendSize=send(clientfd,sendBuf,strlen(sendBuf),0))!=strlen(sendBuf))
+                                    {
+                                        perror("fail");
+                                        exit(1);
+                                    }
+			 
+                    }else if(use.typ == 2)
+			{
+			    if(login(use.name, use.pwd) == 0)
+			    	sendBuf = "yes";
+			    else
+				sendBuf = "no";
+			    if((sendSize=send(clientfd,sendBuf,strlen(sendBuf),0))!=strlen(sendBuf))
+                                    {
+                                        perror("fail");
+                                        exit(1);
+                                    }
+			}
+                   
                     //每加入一个客户端都向fd_set写入
                     fd_A[conn_amount]=clientfd;
                     strcpy(fd_C[conn_amount],use.name);
@@ -157,7 +337,7 @@ int main(int argc,char *argv[])
                 break;
         }
         //FD_COPY(recvfd,servfd);
-        for(i=0;i<MAX_CON_NO;i++)//最大队列进行判断，优化的话，可以使用链表
+ /*       for(i=0;i<MAX_CON_NO;i++)//最大队列进行判断，优化的话，可以使用链表
         {
             if(fd_A[i]!=0)
             {
@@ -179,7 +359,7 @@ int main(int argc,char *argv[])
                 {
                     if(FD_ISSET(fd_A[i],&recvfd))
                     {
-                        /*receive datas from client*/
+                        
                         if((recvSize=recv(fd_A[i],recvBuf,MAX_DATA_SIZE,0))==-1 || recvSize==0)
                         {
                             //perror("fail to receive datas");
@@ -194,7 +374,7 @@ int main(int argc,char *argv[])
                             strcat(sendBuf,":");
                             strcat(sendBuf,recvBuf);
                             
-                            /*send datas to client*/
+                            
                             for(j=0;j<MAX_CON_NO;j++)
                             {
                                 if(fd_A[j]!=0&&i!=j)
@@ -218,7 +398,7 @@ int main(int argc,char *argv[])
                     }
                 }
                 break;
-        }
+        }*/
     }
     return 0;
 }
