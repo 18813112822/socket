@@ -188,7 +188,7 @@ int login(char* username, char* password)
 
 struct user
 {
-    int seq;
+    int typ;
     char name[32];
     char pwd[32];
 };
@@ -291,42 +291,45 @@ int main(int argc,char *argv[])
                     }
                     printf("Success to accpet a connection request...\n");
                     printf(">>>>>> %s:%d join in! ID(fd):%d \n",inet_ntoa(clientSockaddr.sin_addr),ntohs(clientSockaddr.sin_port),clientfd);
-
-                    if((recvSize=recv(clientfd,(char *)&use,sizeof(struct user),0))==-1 || recvSize==0)
-                    {
-                        perror("fail to receive datas");
-                    }
+		    while(1)
+		   {
+			if((recvSize=recv(clientfd,(char *)&use,sizeof(struct user),0))==-1 || recvSize==0)
+                   	 {
+                        	perror("fail to receive datas");
+                    	}
                     
-                    memset(sendBuf,0,sizeof(sendBuf));
-                    if(use.typ==1)
-                    {
-                       if(query(use.name) == 0)
-			{
-			   if(regist(use.name, use.pwd) == 0);
-				sendBuf = "yes";
-			   else
-				sendBuf = "no";
-			}			
-			else
-			   sendBuf = "no";
-			if((sendSize=send(clientfd,sendBuf,strlen(sendBuf),0))!=strlen(sendBuf))
+                    	memset(sendBuf,0,sizeof(sendBuf));
+                   	 if(use.typ==1)
+                   	 {
+                       		if(query(use.name) == 0)
+				{
+			 	  if(regist(use.name, use.pwd) == 0)
+					strcpy(sendBuf, "yes");
+			 	  else
+					strcpy(sendBuf, "no");
+				}			
+				else
+			  	    strcpy(sendBuf, "no");
+				if((sendSize=send(clientfd,sendBuf,strlen(sendBuf),0))!=strlen(sendBuf))
                                     {
                                         perror("fail");
                                         exit(1);
                                     }
 			 
-                    }else if(use.typ == 2)
+                    	}else if(use.typ == 2)
 			{
 			    if(login(use.name, use.pwd) == 0)
-			    	sendBuf = "yes";
+			    	strcpy(sendBuf, "yes");
 			    else
-				sendBuf = "no";
+				strcpy(sendBuf, "no");
 			    if((sendSize=send(clientfd,sendBuf,strlen(sendBuf),0))!=strlen(sendBuf))
                                     {
                                         perror("fail");
                                         exit(1);
                                     }
 			}
+		    }
+                    
                    
                     //每加入一个客户端都向fd_set写入
                     fd_A[conn_amount]=clientfd;

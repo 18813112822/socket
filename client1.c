@@ -20,13 +20,13 @@ struct user
     char pwd[32];
 };
 
-int regist(char* username, char* password)
+int regist(int sockfd, char* username, char* password)
 {
     char recvBuf[MAX_BUF];
     struct user use;
     use.typ = 1;
-    use.name = username;
-    use.pwd = password;
+    strcpy(use.name, username);
+    strcpy(use.pwd, password);
     if(send(sockfd,(char *)&use,sizeof(struct user),0)==-1)
     {
         perror("fail to send datas.");
@@ -49,14 +49,14 @@ int regist(char* username, char* password)
 
 
 
-int login(char* username, char* password)
+int login(int sockfd, char* username, char* password)
 {
     
     char recvBuf[MAX_BUF];
     struct user use;
     use.typ = 2;
-    use.name = username;
-    use.pwd = password;
+    strcpy(use.name, username);
+    strcpy(use.pwd, password);
     if(send(sockfd,(char *)&use,sizeof(struct user),0)==-1)
     {
         perror("fail to send datas.");
@@ -77,7 +77,7 @@ int login(char* username, char* password)
     return 0;
 }
 
-void chatroom()
+/*void chatroom()
 {
 
     //发送用户名和密码过去
@@ -104,7 +104,7 @@ void chatroom()
     {
         perror("fork error\n");
     }
-    else if(pid==0)/*child*/
+    else if(pid==0)
     {
         while(1)
         {
@@ -135,7 +135,7 @@ void chatroom()
     }
 
     close(sockfd);
-}
+}*/
 
 int main(int argc,char *argv[])
 {
@@ -204,7 +204,7 @@ int main(int argc,char *argv[])
 	    scanf("%s",use.name);
 	    printf("input password:");
 	    scanf("%s",use.pwd);
-	    if(regist(use.name, use.pwd) == 0)
+	    if(regist(sockfd, use.name, use.pwd) == 0)
 	    {
 		printf("register success!\n");
 	    }
@@ -220,10 +220,10 @@ int main(int argc,char *argv[])
 	    scanf("%s",use.name);
 	    printf("input password:");
 	    scanf("%s",use.pwd);
-	    if(login(use.name, use.pwd) == 0)
+	    if(login(sockfd, use.name, use.pwd) == 0)
 	    {
 	   	printf("login success!\n");
-		chatroom();
+		//chatroom();
  	    }
 	    else
 	    {
