@@ -163,6 +163,7 @@ int login(char* username, char* password)
                 for(i=1;i<row;i++)
                 {
                     result_row=mysql_fetch_row(res_ptr);
+		    printf("%s %s\n", result_row[0], result_row[1]);
                     if(strcmp(result_row[0], username) == 0 && strcmp(result_row[1], password) == 0)
 		    {
  			mysql_close(&conn);

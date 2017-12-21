@@ -68,10 +68,10 @@ int login(int sockfd, char* username, char* password)
         perror("fail to receive datas.");
         exit(-1);
     }
-    //printf("Server:%s\n",recvBuf);
+   // printf("Server:%s\n",recvBuf);
     if(strcmp(recvBuf,"no")==0)
     {
-        perror("密码或者用户名错误");
+     //   printf("密码或者用户名错误");
         return -1;
     }
     return 0;
@@ -227,7 +227,7 @@ int main(int argc,char *argv[])
  	    }
 	    else
 	    {
-	    	printf("register failed!\n");
+	    	printf("login failed!\n");
 	    }
         }
 	else
