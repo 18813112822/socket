@@ -104,7 +104,7 @@ int query(char* username)
                     if(strcmp(result_row[0], username) == 0)
 		    {
 			mysql_close(&conn);
-			return -1;
+			return 1;
   		    }
                 }
             }
@@ -163,7 +163,7 @@ int login(char* username, char* password)
                 for(i=1;i<row;i++)
                 {
                     result_row=mysql_fetch_row(res_ptr);
-		    printf("%s %s\n", result_row[0], result_row[1]);
+		   // printf("%s %s\n", result_row[0], result_row[1]);
                     if(strcmp(result_row[0], username) == 0 && strcmp(result_row[1], password) == 0)
 		    {
  			mysql_close(&conn);
@@ -187,11 +187,78 @@ int login(char* username, char* password)
     return -1;
 }
 
+//create a table
+int create(char* tablename)
+{ 
+    MYSQL conn;
+    int res;
+    char sql[100]="create table ";
+    strcat(sql, tablename);
+    strcat(sql, "(friend varchar(32));");
+    mysql_init(&conn);
+    printf("%s\n", sql);
+    if(mysql_real_connect(&conn,HOST,USERNAME,PASSWORD,DATABASE,0,NULL,CLIENT_FOUND_ROWS))
+    {
+        printf("Connect Success!\n");
+        res=mysql_query(&conn,sql);
+        if(res)
+        {
+            printf("create table Error!\n");
+        }
+        else
+        {
+            printf("create table Success!\n");
+        }
+    }
+    else
+    {
+        printf("Connect Failed!\n");
+        exit(-1);
+    }
+    return 0;
+}
+
+//add friend list
+int add(char* username, char* friendname)
+{
+    MYSQL conn;
+    int res;
+    char sql[100]="insert into ";
+    strcat(sql, username);
+    strcat(sql, " values('");
+    
+    strcat(sql, friendname);
+    strcat(sql, "');");
+    printf("%s\n", sql);
+    mysql_init(&conn);
+
+    if(mysql_real_connect(&conn,HOST,USERNAME,PASSWORD,DATABASE,0,NULL,CLIENT_FOUND_ROWS))
+    {
+        //printf("Connect Success!\n");
+        res=mysql_query(&conn,sql);
+        if(res)
+        {
+            printf("Insert Error!\n");
+        }
+        else
+        {
+            //printf("Insert Success!\n");
+        }
+    }
+    else
+    {
+        printf("Connect Failed!\n");
+        return -1;
+    }
+    return 0;
+}
+
 struct user
 {
     int typ;
     char name[32];
     char pwd[32];
+    char friendname[32];
 };
 
 int main(int argc,char *argv[])
@@ -300,10 +367,12 @@ int main(int argc,char *argv[])
                     	}
                     
                     	memset(sendBuf,0,sizeof(sendBuf));
+
                    	 if(use.typ==1)
                    	 {
                        		if(query(use.name) == 0)
 				{
+				  create(use.name);
 			 	  if(regist(use.name, use.pwd) == 0)
 					strcpy(sendBuf, "yes");
 			 	  else
@@ -316,10 +385,26 @@ int main(int argc,char *argv[])
                                         perror("fail");
                                         exit(1);
                                     }
+				continue;
 			 
-                    	}else if(use.typ == 2)
+                    	}
+
+		 	if(use.typ == 2)
 			{
 			    if(login(use.name, use.pwd) == 0)
+			    	strcpy(sendBuf, "yes");
+			    else
+				strcpy(sendBuf, "no");
+			    if((sendSize=send(clientfd,sendBuf,strlen(sendBuf),0))!=strlen(sendBuf))
+                                    {
+                                        perror("fail");
+                                        exit(1);
+                                    }
+			}
+
+			if(use.typ == 3)
+			{
+			    if(add(use.name, use.friendname) == 0)
 			    	strcpy(sendBuf, "yes");
 			    else
 				strcpy(sendBuf, "no");

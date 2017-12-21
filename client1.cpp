@@ -8,17 +8,17 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-
 #define MAX_BUF 4096
 #define SERVER_PORT 12138
-
 
 struct user
 {
     int typ;
     char name[32];
     char pwd[32];
+    char friendname[32];
 };
+
 
 int regist(int sockfd, char* username, char* password)
 {
@@ -75,6 +75,65 @@ int login(int sockfd, char* username, char* password)
         return -1;
     }
     return 0;
+}
+
+int add(int sockfd, char* username, char* friendname)
+{
+    
+    char recvBuf[MAX_BUF];
+    struct user use;
+    use.typ = 3;
+    strcpy(use.name, username);
+    strcpy(use.friendname, friendname);
+    if(send(sockfd,(char *)&use,sizeof(struct user),0)==-1)
+    {
+        printf(" add fail to send datas.");
+        exit(-1);
+    }
+
+    if(recv(sockfd,recvBuf,MAX_BUF,0)==-1)
+    {
+        printf("add fail to receive datas.");
+        exit(-1);
+    }
+   // printf("Server:%s\n",recvBuf);
+    if(strcmp(recvBuf,"no")==0)
+    {
+     //   printf("密码或者用户名错误");
+        return -1;
+    }
+    return 0;
+}
+
+
+void chatroom(int sockfd, char* usename)
+{
+    while(1)
+    {
+	printf("*******chatroom********\n");
+   	printf("1. add\n");
+  	printf("2. ls\n");
+   	printf("3. chat\n");
+        printf("4. profile\n");
+        printf("5. sync\n");
+        printf("6. exit\n");
+        int n = 0;
+        printf("input:");
+        scanf("%d",&n);
+
+        if(n == 1)
+	{
+	    char* name;
+	    printf("input the username:");
+            scanf("%s", name);
+            if(add(sockfd, usename, name) == 0)
+		printf("add success\n");
+	    else
+		printf("add failed\n");
+	}
+    }
+    return;
+    
 }
 
 /*void chatroom()
@@ -154,10 +213,7 @@ int main(int argc,char *argv[])
         perror("use: ./client [hostname]");
         exit(-1);
     }
-    //strcpy(use.name,argv[2]);
-    //strcpy(use.pwd,argv[3]);
-    //printf("username:%s\n",use.name);
-    //printf("password:%s\n",use.pwd);
+    
     host=gethostbyname(argv[1]);
     
     if(host==NULL)
@@ -223,7 +279,7 @@ int main(int argc,char *argv[])
 	    if(login(sockfd, use.name, use.pwd) == 0)
 	    {
 	   	printf("login success!\n");
-		//chatroom();
+		chatroom(sockfd, use.name);
  	    }
 	    else
 	    {
