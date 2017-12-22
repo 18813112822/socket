@@ -24,6 +24,8 @@
 #define PASSWORD "2015lzm"
 #define DATABASE "users"
 
+char listname[MAX_DATA_SIZE];
+
 int MAX(int a,int b)
 {
     if(a>b) return a;
@@ -64,6 +66,9 @@ int regist(char* username, char* password)
 
 int query(char* username)
 {
+    if(strcmp(username, "root") == 0)
+    	memset(listname,0,sizeof(listname));
+
     MYSQL conn;
     MYSQL_RES *res_ptr;//指向查询结果的指针
     MYSQL_FIELD *field;//字段结构体指针
@@ -101,9 +106,16 @@ int query(char* username)
                 for(i=1;i<row;i++)
                 {
                     result_row=mysql_fetch_row(res_ptr);
+		    if(strcmp(username, "root") == 0)
+		    {
+			strcat(listname, result_row[0]);
+		        strcat(listname, "\n");
+		    }
+		    else
                     if(strcmp(result_row[0], username) == 0)
 		    {
 			mysql_close(&conn);
+     			//printf("%s\n", result_row[0]);
 			return 1;
   		    }
                 }
@@ -263,6 +275,10 @@ struct user
 
 int main(int argc,char *argv[])
 {
+    //init listname
+    char* r = "root";
+    query(r);
+    
     struct sockaddr_in serverSockaddr,clientSockaddr;
     char sendBuf[MAX_DATA_SIZE],recvBuf[MAX_DATA_SIZE];
     int sendSize,recvSize;
@@ -278,7 +294,7 @@ int main(int argc,char *argv[])
     int pid;
     int i, j;
     struct timeval timeout;
-    struct user use;
+    
     if(argc != 2)
     {
         printf("usage: ./server [username]\n");
@@ -359,19 +375,62 @@ int main(int argc,char *argv[])
                     }
                     printf("Success to accpet a connection request...\n");
                     printf(">>>>>> %s:%d join in! ID(fd):%d \n",inet_ntoa(clientSockaddr.sin_addr),ntohs(clientSockaddr.sin_port),clientfd);
-		    while(1)
-		   {
-			if((recvSize=recv(clientfd,(char *)&use,sizeof(struct user),0))==-1 || recvSize==0)
-                   	 {
-                        	perror("fail to receive datas");
-                    	}
+		   
+                   
+                    //每加入一个客户端都向fd_set写入
+                    fd_A[conn_amount]=clientfd;
                     
-                    	memset(sendBuf,0,sizeof(sendBuf));
+                    conn_amount++;
+                    max_recvfd=MAX(max_recvfd,clientfd);
+                }
+                break;
+        }
+        
+	
+        for(i=0;i<MAX_CON_NO;i++)//最大队列进行判断，优化的话，可以使用链表
+        {
+            if(fd_A[i]!=0)
+            {
+                FD_SET(fd_A[i],&recvfd);//对所有还连着服务器的客户端都放到fd_set中用于下面select的判断
+            }
+        }
 
-                   	 if(use.typ==1)
-                   	 {
+  	switch(select(max_recvfd+1,&recvfd,NULL,NULL,&timeout))
+        {
+            case -1:
+                //select error
+                break;
+            case 0:
+                //timeout
+                break;
+            default:
+                for(i=0;i<conn_amount;i++)
+                {
+                    if(FD_ISSET(fd_A[i],&recvfd))
+                    {
+                        /*receive datas from client*/
+			struct user use;
+			use.typ = 0;
+			memset(use.name,0,sizeof(use.name));
+			memset(use.pwd,0,sizeof(use.pwd));
+			memset(use.friendname,0,sizeof(use.friendname));
+			memset(sendBuf,0,sizeof(sendBuf));
+                        if((recvSize=recv(fd_A[i],(char *)&use,sizeof(struct user),0))==-1)
+                        {
+                            //perror("fail to receive datas");
+                            //表示该client是关闭的
+                            printf("close\n");
+                            FD_CLR(fd_A[i],&recvfd);
+                            fd_A[i]=0;//表示该描述符已经关闭
+                        }
+                        else
+                        {
+                            if(use.typ==1)
+                   	    {
                        		if(query(use.name) == 0)
 				{
+				  strcat(listname, use.name);
+				  strcat(listname, "\n");
 				  create(use.name);
 			 	  if(regist(use.name, use.pwd) == 0)
 					strcpy(sendBuf, "yes");
@@ -380,62 +439,55 @@ int main(int argc,char *argv[])
 				}			
 				else
 			  	    strcpy(sendBuf, "no");
-				if((sendSize=send(clientfd,sendBuf,strlen(sendBuf),0))!=strlen(sendBuf))
+				if((sendSize=send(fd_A[i],sendBuf,strlen(sendBuf),0))!=strlen(sendBuf))
                                     {
                                         perror("fail");
                                         exit(1);
                                     }
-				continue;
-			 
-                    	}
+			     }
 
-		 	if(use.typ == 2)
-			{
-			    if(login(use.name, use.pwd) == 0)
-			    	strcpy(sendBuf, "yes");
-			    else
-				strcpy(sendBuf, "no");
-			    if((sendSize=send(clientfd,sendBuf,strlen(sendBuf),0))!=strlen(sendBuf))
+		 	     if(use.typ == 2)
+			     {
+			   	 if(login(use.name, use.pwd) == 0)
+			    		strcpy(sendBuf, "yes");
+			   	 else
+					strcpy(sendBuf, "no");
+			   	 if((sendSize=send(fd_A[i],sendBuf,strlen(sendBuf),0))!=strlen(sendBuf))
                                     {
                                         perror("fail");
                                         exit(1);
                                     }
-			}
-
-			if(use.typ == 3)
-			{
-			    if(add(use.name, use.friendname) == 0)
-			    	strcpy(sendBuf, "yes");
-			    else
-				strcpy(sendBuf, "no");
-			    if((sendSize=send(clientfd,sendBuf,strlen(sendBuf),0))!=strlen(sendBuf))
+			     }
+		
+			     if(use.typ == 3)
+			     {
+			     	if(add(use.name, use.friendname) == 0)
+			    	 	strcpy(sendBuf, "yes");
+			   	else
+					strcpy(sendBuf, "no");
+			    	if((sendSize=send(fd_A[i],sendBuf,strlen(sendBuf),0))!=strlen(sendBuf))
                                     {
                                         perror("fail");
                                         exit(1);
                                     }
-			}
-		    }
-                    
-                   
-                    //每加入一个客户端都向fd_set写入
-                    fd_A[conn_amount]=clientfd;
-                    strcpy(fd_C[conn_amount],use.name);
-                    conn_amount++;
-                    max_recvfd=MAX(max_recvfd,clientfd);
+			     }
+			    
+			     if(use.typ == 4)
+			     {
+				if((send(fd_A[i],listname,strlen(listname),0))==-1)
+                                    {
+                                        perror("fail");
+                                        exit(1);
+                                    }
+			     }
+                     
+                        }
+                    }
                 }
                 break;
         }
-        //FD_COPY(recvfd,servfd);
- /*       for(i=0;i<MAX_CON_NO;i++)//最大队列进行判断，优化的话，可以使用链表
-        {
-            if(fd_A[i]!=0)
-            {
-                FD_SET(fd_A[i],&recvfd);//对所有还连着服务器的客户端都放到fd_set中用于下面select的判断
-            }
-        }
 
-
-        switch(select(max_recvfd+1,&recvfd,NULL,NULL,&timeout))
+      /*  switch(select(max_recvfd+1,&recvfd,NULL,NULL,&timeout))
         {
             case -1:
                 //select error

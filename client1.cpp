@@ -11,6 +11,8 @@
 #define MAX_BUF 4096
 #define SERVER_PORT 12138
 
+char listname[MAX_BUF];
+
 struct user
 {
     int typ;
@@ -51,7 +53,7 @@ int regist(int sockfd, char* username, char* password)
 
 int login(int sockfd, char* username, char* password)
 {
-    
+  
     char recvBuf[MAX_BUF];
     struct user use;
     use.typ = 2;
@@ -79,8 +81,8 @@ int login(int sockfd, char* username, char* password)
 
 int add(int sockfd, char* username, char* friendname)
 {
-    
-    char recvBuf[MAX_BUF];
+    char recvBuf[4];
+    memset(recvBuf,0,sizeof(recvBuf));
     struct user use;
     use.typ = 3;
     strcpy(use.name, username);
@@ -96,7 +98,7 @@ int add(int sockfd, char* username, char* friendname)
         printf("add fail to receive datas.");
         exit(-1);
     }
-   // printf("Server:%s\n",recvBuf);
+   // printf("%s\n",recvBuf);
     if(strcmp(recvBuf,"no")==0)
     {
      //   printf("密码或者用户名错误");
@@ -105,6 +107,25 @@ int add(int sockfd, char* username, char* friendname)
     return 0;
 }
 
+void ls(int sockfd)
+{
+    struct user use;
+    
+    use.typ = 4;
+    if(send(sockfd,(char *)&use,sizeof(struct user),0)==-1)
+    {
+        printf(" ls fail to send datas.");
+	return;
+    }
+
+    if(recv(sockfd,listname,sizeof(listname),0)==-1)
+    {
+        printf("ls fail to receive datas.");
+	return;
+    }
+   // printf("%s\n", listname);
+    return;
+}
 
 void chatroom(int sockfd, char* usename)
 {
@@ -123,14 +144,34 @@ void chatroom(int sockfd, char* usename)
 
         if(n == 1)
 	{
-	    char* name;
+	    char name[32];
 	    printf("input the username:");
             scanf("%s", name);
             if(add(sockfd, usename, name) == 0)
 		printf("add success\n");
 	    else
 		printf("add failed\n");
+	    continue;
 	}
+	
+	if(n == 2)
+  	{
+	    memset(listname,0,sizeof(listname));
+	    ls(sockfd);
+	    printf("all username:");
+	    printf("%s\n",listname);
+  	    continue;
+	}
+	
+	if(n == 3)
+	{
+	   char name[32];
+	   printf("input the username:"); 
+	   scanf("%s", name);
+	   //chat(sockfd, name);	
+	}
+	if(n == 6)
+	    break;
     }
     return;
     
