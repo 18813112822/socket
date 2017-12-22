@@ -271,6 +271,7 @@ struct user
     char name[32];
     char pwd[32];
     char friendname[32];
+    char sentence[200];
 };
 
 int main(int argc,char *argv[])
@@ -414,6 +415,7 @@ int main(int argc,char *argv[])
 			memset(use.name,0,sizeof(use.name));
 			memset(use.pwd,0,sizeof(use.pwd));
 			memset(use.friendname,0,sizeof(use.friendname));
+			memset(use.sentence,0,sizeof(use.sentence));
 			memset(sendBuf,0,sizeof(sendBuf));
                         if((recvSize=recv(fd_A[i],(char *)&use,sizeof(struct user),0))==-1)
                         {

@@ -19,6 +19,7 @@ struct user
     char name[32];
     char pwd[32];
     char friendname[32];
+    char sentence[200];
 };
 
 
@@ -127,6 +128,25 @@ void ls(int sockfd)
     return;
 }
 
+void chat(int sockfd, char* usename)
+{
+    struct user use;
+    use.typ = 5;
+    use.friendname = usename;
+    
+    if(send(sockfd,(char *)&use,sizeof(struct user),0)==-1)
+    {
+        printf(" ls fail to send datas.");
+	return;
+    }
+
+    if(recv(sockfd,listname,sizeof(listname),0)==-1)
+    {
+        printf("ls fail to receive datas.");
+	return;
+    }
+}
+
 void chatroom(int sockfd, char* usename)
 {
     while(1)
@@ -168,7 +188,8 @@ void chatroom(int sockfd, char* usename)
 	   char name[32];
 	   printf("input the username:"); 
 	   scanf("%s", name);
-	   //chat(sockfd, name);	
+	   chat(sockfd, name);	
+	   continue;
 	}
 	if(n == 6)
 	    break;
