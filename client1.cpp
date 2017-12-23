@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <unistd.h>
 
 #define MAX_BUF 4096
 #define SERVER_PORT 12138
@@ -128,36 +129,87 @@ void ls(int sockfd)
     return;
 }
 
-void chat(int sockfd, char* usename)
+void chat(int sockfd, char* usename, char* friendname)
 {
-    struct user use;
-    use.typ = 5;
-    use.friendname = usename;
+    char sendBuf[MAX_BUF];
+    char recvBuf[MAX_BUF];
+    printf("*******chat********\n");
+    printf("1.sendmessage\n");
+    printf("2.sendfile\n");
+    printf("3.exit\n");
     
-    if(send(sockfd,(char *)&use,sizeof(struct user),0)==-1)
-    {
-        printf(" ls fail to send datas.");
-	return;
-    }
+    int pid;
 
-    if(recv(sockfd,listname,sizeof(listname),0)==-1)
+    //send-recv
+    if((pid=fork())<0)
     {
-        printf("ls fail to receive datas.");
-	return;
+        perror("fork error\n");
     }
+    else if(pid==0)
+    {
+        while(1)
+        {
+	    int n;
+	    printf("input:");
+	    scanf("%d", &n);
+	    char c;
+	    scanf("%c", &c);
+          
+            if(n == 1)
+	    {
+		memset(sendBuf,0,sizeof(sendBuf));
+	        gets(sendBuf);
+	        printf("%s\n", sendBuf);
+	        struct user use;
+   	        use.typ = 5;
+	        strcpy(use.name, usename);
+   	        strcpy(use.friendname, friendname);
+		strcpy(use.sentence, sendBuf);
+      	        if(send(sockfd,(char *)&use,sizeof(struct user),0)==-1)
+  	        {
+        		printf(" chat fail to send datas.");
+	         	return;
+    	        }
+	    	continue;
+	    }
+        }
+    }
+    else
+    {
+        while(1)
+        {
+	    struct user use;
+	    memset(use.name,0,sizeof(use.name));
+	    memset(use.sentence,0,sizeof(use.sentence));
+            if(recv(sockfd,(char *)&use,sizeof(struct user),0)==-1)
+            {
+                printf("Server maybe shutdown!");
+                break;
+            }
+            if(use.typ == 5)
+	    {
+		printf("%s:%s\n", use.name, use.sentence);
+		continue;
+	    }
+	    
+            
+        }
+    }
+    
+    
 }
 
 void chatroom(int sockfd, char* usename)
 {
+    printf("*******chatroom********\n");
+    printf("1. add\n");
+    printf("2. ls\n");
+    printf("3. chat\n");
+    printf("4. profile\n");
+    printf("5. sync\n");
+    printf("6. exit\n");
     while(1)
     {
-	printf("*******chatroom********\n");
-   	printf("1. add\n");
-  	printf("2. ls\n");
-   	printf("3. chat\n");
-        printf("4. profile\n");
-        printf("5. sync\n");
-        printf("6. exit\n");
         int n = 0;
         printf("input:");
         scanf("%d",&n);
@@ -188,7 +240,7 @@ void chatroom(int sockfd, char* usename)
 	   char name[32];
 	   printf("input the username:"); 
 	   scanf("%s", name);
-	   chat(sockfd, name);	
+	   chat(sockfd, usename, name);	
 	   continue;
 	}
 	if(n == 6)

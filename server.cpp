@@ -26,6 +26,15 @@
 
 char listname[MAX_DATA_SIZE];
 
+struct user
+{
+    int typ;
+    char name[32];
+    char pwd[32];
+    char friendname[32];
+    char sentence[200];
+};
+
 int MAX(int a,int b)
 {
     if(a>b) return a;
@@ -35,11 +44,14 @@ int MAX(int a,int b)
 int regist(char* username, char* password)
 {
     MYSQL conn;
+    char* sentence = "no message\n";
     int res;
-    char sql[100]="insert into uap values('";
+    char sql[4196]="insert into uapam values('";
     strcat(sql, username);
     strcat(sql, "','");
     strcat(sql, password);
+    strcat(sql, "','");
+    strcat(sql, sentence);
     strcat(sql, "');");
     mysql_init(&conn);
 
@@ -77,7 +89,7 @@ int query(char* username)
     int res;
     int i;
     int row,column;//查询返回的行数和列数
-    char *sql="select * from uap;";
+    char *sql="select * from uapam;";
     mysql_init(&conn);
 
 
@@ -136,6 +148,38 @@ int query(char* username)
     return 0;
 }
 
+int modify(char* name, char* sentence)
+{
+    MYSQL conn;
+    int res;
+    char sql[4196]="update uapam set message = '";
+    strcat(sql, sentence);
+    strcat(sql, "' where username = '");
+    strcat(sql, name);
+    strcat(sql, "';");
+    mysql_init(&conn);
+
+    if(mysql_real_connect(&conn,HOST,USERNAME,PASSWORD,DATABASE,0,NULL,CLIENT_FOUND_ROWS))
+    {
+        //printf("Connect Success!\n");
+        res=mysql_query(&conn,sql);
+        if(res)
+        {
+            printf("modify Error!\n");
+        }
+        else
+        {
+            //printf("Insert Success!\n");
+        }
+    }
+    else
+    {
+        printf("Connect Failed!\n");
+        return -1;
+    }
+    return 0;
+}
+
 int login(char* username, char* password)
 {
     MYSQL conn;
@@ -146,7 +190,7 @@ int login(char* username, char* password)
     int res;
     int i;
     int row,column;//查询返回的行数和列数
-    char *sql="select * from uap;";
+    char *sql="select * from uapam;";
     mysql_init(&conn);
 
 
@@ -265,14 +309,7 @@ int add(char* username, char* friendname)
     return 0;
 }
 
-struct user
-{
-    int typ;
-    char name[32];
-    char pwd[32];
-    char friendname[32];
-    char sentence[200];
-};
+
 
 int main(int argc,char *argv[])
 {
@@ -378,17 +415,17 @@ int main(int argc,char *argv[])
                     printf(">>>>>> %s:%d join in! ID(fd):%d \n",inet_ntoa(clientSockaddr.sin_addr),ntohs(clientSockaddr.sin_port),clientfd);
 		   
                    
-                    //每加入一个客户端都向fd_set写入
+                    //加入一个客户端
+                    while(fd_A[conn_amount] != 0)
+                    	conn_amount = (conn_amount+1) % BACKLOG;
                     fd_A[conn_amount]=clientfd;
-                    
-                    conn_amount++;
-                    max_recvfd=MAX(max_recvfd,clientfd);
+		    max_recvfd=MAX(max_recvfd,clientfd);
                 }
                 break;
         }
         
 	
-        for(i=0;i<MAX_CON_NO;i++)//最大队列进行判断，优化的话，可以使用链表
+        for(i=0;i<BACKLOG;i++)//最大队列进行判断，优化的话，可以使用链表
         {
             if(fd_A[i]!=0)
             {
@@ -405,7 +442,7 @@ int main(int argc,char *argv[])
                 //timeout
                 break;
             default:
-                for(i=0;i<conn_amount;i++)
+                for(i=0;i<BACKLOG;i++)
                 {
                     if(FD_ISSET(fd_A[i],&recvfd))
                     {
@@ -450,6 +487,8 @@ int main(int argc,char *argv[])
 
 		 	     if(use.typ == 2)
 			     {
+				 memset(fd_C[i],0,sizeof(fd_C[i]));
+				 strcpy(fd_C[i], use.name);
 			   	 if(login(use.name, use.pwd) == 0)
 			    		strcpy(sendBuf, "yes");
 			   	 else
@@ -481,6 +520,31 @@ int main(int argc,char *argv[])
                                         perror("fail");
                                         exit(1);
                                     }
+			     }
+			     
+			     if(use.typ == 5)
+			     {
+				int flag = 0;
+				for(int k = 0; k < BACKLOG; k++)
+				{
+				    if(strcmp(fd_C[k], use.friendname) == 0)
+				    {
+					flag = 1;
+					if((send(fd_A[k],(char*)&use,sizeof(struct user),0))==-1)
+                                    	{
+                                       		 perror("fail");
+                                       		 exit(1);
+                                    	}
+				    }
+				}
+				if(flag == 1)
+				{
+    				    strcat(sendBuf, use.name);
+				    strcat(sendBuf, ":");
+				    strcat(sendBuf, use.sentence);
+				    strcat(sendBuf, "\n");
+				    modify(use.friendname, sendBuf);
+				}
 			     }
                      
                         }
