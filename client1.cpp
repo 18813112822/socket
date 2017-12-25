@@ -14,7 +14,7 @@
 #define SERVER_PORT 12138
 
 char listname[MAX_BUF];
-
+char friendlist[MAX_BUF];
 struct user
 {
     int typ;
@@ -104,7 +104,6 @@ int add(int sockfd, char* username, char* friendname)
    // printf("%s\n",recvBuf);
     if(strcmp(recvBuf,"no")==0)
     {
-     //   printf("密码或者用户名错误");
         return -1;
     }
     return 0;
@@ -132,24 +131,42 @@ void ls(int sockfd)
 
 void chat(int sockfd, char* usename, char* friendname)
 {
+    FILE* stream;
     char sendBuf[MAX_BUF];
     char sendmessage[MAX_BUF];
     char recvBuf[MAX_BUF];
-
-    printf("*******chat********\n");
-    printf("1.sendmessage\n");
-    printf("2.sendfile\n");
-    printf("3.exit\n");
+    char filename[MAX_BUF];
+    memset(recvBuf, 0, sizeof(recvBuf));
 
     struct user use;
     use.typ = 6;
     memset(use.name, 0, sizeof(use.name));
+    memset(use.friendname, 0, sizeof(use.friendname));
     strcpy(use.name, usename);
+    strcpy(use.friendname, friendname);
     if(send(sockfd,(char *)&use,sizeof(struct user),0)==-1)
     {
         printf(" chat fail to send datas.");
 	return;
     }
+    
+    if(recv(sockfd,recvBuf,sizeof(recvBuf),0)==-1)
+    {
+        printf(" chat fail to send datas.");
+	return;
+    }
+
+    if(strcmp(recvBuf, "no") == 0)
+    {
+	printf("you are not friends\n");
+	return;
+    }
+    printf("*******chat********\n");
+    printf("1.sendmessage\n");
+    printf("2.sendfile\n");
+    printf("3.exit\n");
+
+   
 
     int pid;
 
@@ -188,6 +205,43 @@ void chat(int sockfd, char* usename, char* friendname)
 	         	return;
     	        }
 	    	continue;
+	    }
+
+	    memset(op, 0, sizeof(op));
+	    strncpy(op, sendBuf, 8);
+ 	    op[8] = '\0';
+	    if(strcmp(op, "sendfile") == 0)
+	    {
+		use.typ = 9;
+ 		memset(use.name, 0, sizeof(use.name));
+		memset(filename, 0, sizeof(filename));
+
+		strcpy(use.name, usename);
+		if(send(sockfd,(char *)&use,sizeof(struct user),0)==-1)
+  	        {
+        		printf(" chat fail to send datas.");
+	         	return;
+    	        }
+
+		strcpy(filename, sendBuf+9);
+		if((stream = fopen(filename, "r")) == NULL)
+		{
+		    printf("the file is not exit\n");
+		    continue;
+		}
+		
+		memset(sendBuf, 0, sizeof(sendBuf)); 
+      		int length = 0;  
+      		while((length = fread(buffer, sizeof(char), sizeof(sendBuf), fp)) > 0) 
+      		{ 
+       	 	    if(send(sockfd, buffer, length, 0) < 0) 
+        	    { 
+          		printf("Send File:%s Failed./n", filename); 
+          		break; 
+        	    } 
+        	    memset(sendBuf, 0, sizeof(sendBuf));  
+		}
+		continue;
 	    }
 
 	    memset(op, 0, sizeof(op));
@@ -262,6 +316,28 @@ void recvmessage(int sockfd, char* username)
     return;
 }
 
+void sync(int sockfd, char* username)
+{
+    struct user use;
+    use.typ = 8;
+    memset(use.name, 0, sizeof(use.name));
+    strcpy(use.name, username);
+    if(send(sockfd,(char *)&use,sizeof(struct user),0)==-1)
+    {
+        printf(" sync fail to send datas.");
+	return;
+    }
+
+    if(recv(sockfd,friendlist,sizeof(friendlist),0)==-1)
+    {
+        printf("sync fail to receive datas.");
+	return;
+    }
+   // printf("%s\n", revBuf);
+
+    return;
+}
+
 void chatroom(int sockfd, char* usename)
 {
     
@@ -315,7 +391,15 @@ void chatroom(int sockfd, char* usename)
 	}
 	if(n == 5)
 	{
-	    printf("current user:%s\n", use.name);
+	    printf("current user:%s\n", usename);
+	    printf("friendlist\n");
+	    printf("%s", friendlist);
+	    continue;
+	}
+	if(n == 6)
+	{
+	    sync(sockfd, usename);
+	    continue;
 	}
 	if(n == 7)
 	    break;
@@ -327,6 +411,7 @@ void chatroom(int sockfd, char* usename)
 
 int main(int argc,char *argv[])
 {
+    memset(friendlist, 0, sizeof(friendlist));
     int sockfd;//socket
     char sendBuf[MAX_BUF],recvBuf[MAX_BUF];
     int sendSize,recvSize;//用于记录记录发送和接收到数据的大小
