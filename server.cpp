@@ -274,6 +274,70 @@ int create(char* tablename)
     return 0;
 }
 
+//create a table
+int createcache(char* tablename)
+{ 
+    MYSQL conn;
+    int res;
+    char sql[100]="create table ";
+    strcat(sql, tablename);
+    strcat(sql, "cache(sentence varchar(4096));");
+    mysql_init(&conn);
+   // printf("%s\n", sql);
+    if(mysql_real_connect(&conn,HOST,USERNAME,PASSWORD,DATABASE,0,NULL,CLIENT_FOUND_ROWS))
+    {
+        printf("Connect Success!\n");
+        res=mysql_query(&conn,sql);
+        if(res)
+        {
+            printf("create table Error!\n");
+        }
+        else
+        {
+            printf("create table Success!\n");
+        }
+    }
+    else
+    {
+        printf("Connect Failed!\n");
+        exit(-1);
+    }
+    return 0;
+}
+
+void cache(char* username, char* sentence)
+{
+    MYSQL conn;
+    int res;
+    char sql[4196]="insert into ";
+    strcat(sql, username);
+    strcat(sql, "cache values('");
+    strcat(sql, sentence);
+    strcat(sql, "');");
+    mysql_init(&conn);
+
+    if(mysql_real_connect(&conn,HOST,USERNAME,PASSWORD,DATABASE,0,NULL,CLIENT_FOUND_ROWS))
+    {
+        //printf("Connect Success!\n");
+        res=mysql_query(&conn,sql);
+        if(res)
+        {
+            printf("Insert Error!\n");
+        }
+        else
+        {
+            //printf("Insert Success!\n");
+        }
+    }
+    else
+    {
+        printf("Connect Failed!\n");
+        return;
+    }
+    return;
+}
+
+
 //add friend list
 int add(char* username, char* friendname)
 {
@@ -309,7 +373,100 @@ int add(char* username, char* friendname)
     return 0;
 }
 
+int getcache(char* username, char* sendm)
+{
+	 MYSQL conn;
+    MYSQL_RES *res_ptr;//指向查询结果的指针
+    MYSQL_FIELD *field;//字段结构体指针
+    MYSQL_ROW result_row;//按行返回的查询信息
 
+    int res;
+    int i;
+    int row,column;//查询返回的行数和列数
+    char sql[100]="select * from ";
+	strcat(sql, username);
+	strcat(sql, "cache;");
+    mysql_init(&conn);
+
+
+    if(mysql_real_connect(&conn,HOST,USERNAME,PASSWORD,DATABASE,0,NULL,CLIENT_FOUND_ROWS))
+    {
+        //printf("Connect Success!\n");
+        res=mysql_query(&conn,sql);
+        //res=0表示查询成功
+        if(res)
+        {
+            printf("Select Error!\n");
+        }
+        else
+        {
+           // printf("Select Success!\n");
+            //将查询的结果给res_ptr
+            res_ptr=mysql_store_result(&conn);
+            //如果结果不为空，就可以输出了
+            if(res_ptr)//可以用这个的真假来判断用户名密码是否正确
+            {
+                //有结果了
+                column=mysql_num_fields(res_ptr);//获取列数
+                row=mysql_num_rows(res_ptr)+1;//加1是因为第一行是字段名
+               
+				int begin = 1;
+                //按行输出结果
+				if(row > 11)
+					begin = row - 10;
+       			if(row == 1)
+					return -1;
+                for(i=begin;i<row;i++)
+                {
+                    result_row=mysql_fetch_row(res_ptr);
+                    strcat(sendm, result_row[0]);
+                }
+            }
+            else
+            {
+                //没有结果
+                printf("没有查询到匹配的数据。");
+            }
+        }
+    }
+    else
+    {
+        printf("Connect Failed!\n");
+        return -1;
+    }
+    mysql_close(&conn);
+    return 0;
+}
+
+void deletecache(char* username)
+{
+	MYSQL conn;
+	int res;
+    char sql[100]="delete from ";
+    strcat(sql, username);
+    strcat(sql, "cache;");
+    mysql_init(&conn);
+
+    if(mysql_real_connect(&conn,HOST,USERNAME,PASSWORD,DATABASE,0,NULL,CLIENT_FOUND_ROWS))
+    {
+        //printf("Connect Success!\n");
+        res=mysql_query(&conn,sql);
+        if(res)
+        {
+            printf("delete Error!\n");
+        }
+        else
+        {
+            //printf("Insert Success!\n");
+        }
+    }
+    else
+    {
+        printf("Connect Failed!\n");
+        return;
+    }
+    return;
+}
 
 int main(int argc,char *argv[])
 {
@@ -318,12 +475,14 @@ int main(int argc,char *argv[])
     query(r);
     
     struct sockaddr_in serverSockaddr,clientSockaddr;
+    char sendm[40960];
     char sendBuf[MAX_DATA_SIZE],recvBuf[MAX_DATA_SIZE];
     int sendSize,recvSize;
     int sockfd,clientfd;
     fd_set servfd,recvfd;//用于select处理用的
     int fd_A[BACKLOG+1];//保存客户端的socket描述符
     char fd_C[BACKLOG+1][32];//用于保存客户端的用户名
+    int chaton[BACKLOG+1]; 
     int conn_amount;//用于计算客户端的个数
     int max_servfd,max_recvfd;
     int on=1;
@@ -387,7 +546,7 @@ int main(int argc,char *argv[])
     max_recvfd=0;//记录最大的client端的socket描述符
     memset(fd_A,0,sizeof(fd_A));
     memset(fd_C,0,sizeof(fd_C));
-
+    memset(chaton,0,sizeof(chaton));
     while(1)
     {
         FD_ZERO(&servfd);//清空所有server的fd
@@ -418,14 +577,14 @@ int main(int argc,char *argv[])
                     //加入一个客户端
                     while(fd_A[conn_amount] != 0)
                     	conn_amount = (conn_amount+1) % BACKLOG;
-                    fd_A[conn_amount]=clientfd;
-		    max_recvfd=MAX(max_recvfd,clientfd);
+                   	fd_A[conn_amount]=clientfd;
+		   			max_recvfd=MAX(max_recvfd,clientfd);
                 }
                 break;
         }
         
 	
-        for(i=0;i<BACKLOG;i++)//最大队列进行判断，优化的话，可以使用链表
+        for(i=0;i<BACKLOG;i++)//最大队列进行判断
         {
             if(fd_A[i]!=0)
             {
@@ -447,13 +606,13 @@ int main(int argc,char *argv[])
                     if(FD_ISSET(fd_A[i],&recvfd))
                     {
                         /*receive datas from client*/
-			struct user use;
-			use.typ = 0;
-			memset(use.name,0,sizeof(use.name));
-			memset(use.pwd,0,sizeof(use.pwd));
-			memset(use.friendname,0,sizeof(use.friendname));
-			memset(use.sentence,0,sizeof(use.sentence));
-			memset(sendBuf,0,sizeof(sendBuf));
+						struct user use;
+						use.typ = 0;
+						memset(use.name,0,sizeof(use.name));
+						memset(use.pwd,0,sizeof(use.pwd));
+						memset(use.friendname,0,sizeof(use.friendname));
+						memset(use.sentence,0,sizeof(use.sentence));
+						memset(sendBuf,0,sizeof(sendBuf));
                         if((recvSize=recv(fd_A[i],(char *)&use,sizeof(struct user),0))==-1)
                         {
                             //perror("fail to receive datas");
@@ -461,91 +620,133 @@ int main(int argc,char *argv[])
                             printf("close\n");
                             FD_CLR(fd_A[i],&recvfd);
                             fd_A[i]=0;//表示该描述符已经关闭
+			    			chaton[i] = 0;
                         }
                         else
                         {
                             if(use.typ==1)
-                   	    {
-                       		if(query(use.name) == 0)
-				{
-				  strcat(listname, use.name);
-				  strcat(listname, "\n");
-				  create(use.name);
-			 	  if(regist(use.name, use.pwd) == 0)
-					strcpy(sendBuf, "yes");
-			 	  else
-					strcpy(sendBuf, "no");
-				}			
-				else
-			  	    strcpy(sendBuf, "no");
-				if((sendSize=send(fd_A[i],sendBuf,strlen(sendBuf),0))!=strlen(sendBuf))
+                   	   		{
+                       			if(query(use.name) == 0)
+								{
+								  strcat(listname, use.name);
+								  strcat(listname, "\n");
+								  create(use.name);
+				 				  createcache(use.name);
+			 	 				  if(regist(use.name, use.pwd) == 0)
+									  strcpy(sendBuf, "yes");
+			 					  else
+					   				  strcpy(sendBuf, "no");
+								}			
+								else
+			  	   				  	strcpy(sendBuf, "no");
+								if((sendSize=send(fd_A[i],sendBuf,strlen(sendBuf),0))!=strlen(sendBuf))
                                     {
                                         perror("fail");
                                         exit(1);
-                                    }
-			     }
+                                    }		
+								continue;
+			    			 }
 
-		 	     if(use.typ == 2)
-			     {
-				 memset(fd_C[i],0,sizeof(fd_C[i]));
-				 strcpy(fd_C[i], use.name);
-			   	 if(login(use.name, use.pwd) == 0)
-			    		strcpy(sendBuf, "yes");
-			   	 else
-					strcpy(sendBuf, "no");
-			   	 if((sendSize=send(fd_A[i],sendBuf,strlen(sendBuf),0))!=strlen(sendBuf))
+		 	    			 if(use.typ == 2)
+			    			 {
+								 memset(fd_C[i],0,sizeof(fd_C[i]));
+								 strcpy(fd_C[i], use.name);
+			   					 if(login(use.name, use.pwd) == 0)
+			    			   	 	strcpy(sendBuf, "yes");
+			   					 else
+									strcpy(sendBuf, "no");
+			   					 if((sendSize=send(fd_A[i],sendBuf,strlen(sendBuf),0))!=strlen(sendBuf))
                                     {
                                         perror("fail");
                                         exit(1);
                                     }
-			     }
+									continue;
+			   				  }
 		
-			     if(use.typ == 3)
-			     {
-			     	if(add(use.name, use.friendname) == 0)
-			    	 	strcpy(sendBuf, "yes");
-			   	else
-					strcpy(sendBuf, "no");
-			    	if((sendSize=send(fd_A[i],sendBuf,strlen(sendBuf),0))!=strlen(sendBuf))
+			   				  if(use.typ == 3)
+			  				   {
+			     					if(add(use.name, use.friendname) == 0)
+			    					 	strcpy(sendBuf, "yes");
+			   						else
+										strcpy(sendBuf, "no");
+			    					
+									if((sendSize=send(fd_A[i],sendBuf,strlen(sendBuf),0))!=strlen(sendBuf))
                                     {
                                         perror("fail");
                                         exit(1);
                                     }
-			     }
+									continue;
+			    			 }
 			    
-			     if(use.typ == 4)
-			     {
-				if((send(fd_A[i],listname,strlen(listname),0))==-1)
+			    			 if(use.typ == 4)
+			   				  {
+								if((send(fd_A[i],listname,strlen(listname),0))==-1)
                                     {
                                         perror("fail");
                                         exit(1);
                                     }
-			     }
+									continue;
+			    			 }
 			     
-			     if(use.typ == 5)
-			     {
-				int flag = 0;
-				for(int k = 0; k < BACKLOG; k++)
-				{
-				    if(strcmp(fd_C[k], use.friendname) == 0)
-				    {
-					flag = 1;
-					if((send(fd_A[k],(char*)&use,sizeof(struct user),0))==-1)
+			   				 if(use.typ == 5)
+			   				  {
+								if(strcmp(use.name, "root") == 0)
+								{
+									if((send(fd_A[i],(char*)&use,sizeof(struct user),0))==-1)
                                     	{
                                        		 perror("fail");
                                        		 exit(1);
                                     	}
-				    }
-				}
-				if(flag == 1)
-				{
-    				    strcat(sendBuf, use.name);
-				    strcat(sendBuf, ":");
-				    strcat(sendBuf, use.sentence);
-				    strcat(sendBuf, "\n");
-				    modify(use.friendname, sendBuf);
-				}
-			     }
+									continue;
+								}
+								//printf("type = 5\n");
+								int flag = 0;
+								for(int k = 0; k < BACKLOG; k++)
+								{
+								    if(strcmp(fd_C[k], use.friendname) == 0 && fd_A[k] != 0 && chaton[k] == 1)
+				 				   {
+										flag = 1;
+										if((send(fd_A[k],(char*)&use,sizeof(struct user),0))==-1)
+                                    	{
+                                       		 perror("fail");
+                                       		 exit(1);
+                                    	}
+				    				}
+								}
+								printf("%d\n", flag);
+								if(flag == 0)
+								{
+    								strcat(sendBuf, use.name);
+								    strcat(sendBuf, ":");
+								    strcat(sendBuf, use.sentence);
+								    strcat(sendBuf, "\n");
+				  					cache(use.friendname, sendBuf);
+								}
+								continue;
+			   				  }
+			  	  
+		 	    			 if(use.typ == 6)
+			     			{
+								chaton[i] = 1;
+			    			 }
+			     
+			    			 if(use.typ == 7)
+			    			 {
+								
+			       				memset(sendm, 0, sizeof(sendm));
+								if(getcache(use.name, sendm) != 0)
+								{
+								    memset(sendm, 0, sizeof(sendm));
+								    strcpy(sendm, "no message\n");
+								}
+				
+								if((send(fd_A[i],sendm,sizeof(sendm),0))==-1)
+                                    	{
+                                       		 perror("fail");
+                                       		 exit(1);
+                                    	}
+								deletecache(use.name);
+			    			 }
                      
                         }
                     }
@@ -553,59 +754,6 @@ int main(int argc,char *argv[])
                 break;
         }
 
-      /*  switch(select(max_recvfd+1,&recvfd,NULL,NULL,&timeout))
-        {
-            case -1:
-                //select error
-                break;
-            case 0:
-                //timeout
-                break;
-            default:
-                for(i=0;i<conn_amount;i++)
-                {
-                    if(FD_ISSET(fd_A[i],&recvfd))
-                    {
-                        
-                        if((recvSize=recv(fd_A[i],recvBuf,MAX_DATA_SIZE,0))==-1 || recvSize==0)
-                        {
-                            //perror("fail to receive datas");
-                            //表示该client是关闭的
-                            printf("fd %d close\n",fd_A[i]);
-                            FD_CLR(fd_A[i],&recvfd);
-                            fd_A[i]=0;
-                        }
-                        else//客户端发送数据过来，然后这里进行转发
-                        {
-			    strcpy(sendBuf,fd_C[i]);
-                            strcat(sendBuf,":");
-                            strcat(sendBuf,recvBuf);
-                            
-                            
-                            for(j=0;j<MAX_CON_NO;j++)
-                            {
-                                if(fd_A[j]!=0&&i!=j)
-                                {
-                                    printf("数据发往%d,",fd_A[j]);
-                                    if((sendSize=send(fd_A[j],sendBuf,strlen(sendBuf),0))!=strlen(sendBuf))
-                                    {
-                                        perror("fail");
-                                        exit(1);
-                                    }
-                                    else
-                                    {
-                                        printf("Success\n");
-                                    }
-                                }
-                            }
-                            //可以判断recvBuf是否为bye来判断是否可以close
-                            memset(recvBuf,0,MAX_DATA_SIZE);
- 			    memset(sendBuf,0,MAX_DATA_SIZE);
-                        }
-                    }
-                }
-                break;
-        }*/
     }
     return 0;
 }

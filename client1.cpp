@@ -8,6 +8,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <signal.h>
 
 #define MAX_BUF 4096
 #define SERVER_PORT 12138
@@ -132,12 +133,24 @@ void ls(int sockfd)
 void chat(int sockfd, char* usename, char* friendname)
 {
     char sendBuf[MAX_BUF];
+    char sendmessage[MAX_BUF];
     char recvBuf[MAX_BUF];
+
     printf("*******chat********\n");
     printf("1.sendmessage\n");
     printf("2.sendfile\n");
     printf("3.exit\n");
-    
+
+    struct user use;
+    use.typ = 6;
+    memset(use.name, 0, sizeof(use.name));
+    strcpy(use.name, usename);
+    if(send(sockfd,(char *)&use,sizeof(struct user),0)==-1)
+    {
+        printf(" chat fail to send datas.");
+	return;
+    }
+
     int pid;
 
     //send-recv
@@ -148,29 +161,49 @@ void chat(int sockfd, char* usename, char* friendname)
     else if(pid==0)
     {
         while(1)
-        {
-	    int n;
-	    printf("input:");
-	    scanf("%d", &n);
-	    char c;
-	    scanf("%c", &c);
-          
-            if(n == 1)
+        { 
+	    memset(sendBuf,0,sizeof(sendBuf));
+     	    gets(sendBuf);
+            char op[20];
+ 	    memset(op, 0, sizeof(op));
+	    strncpy(op, sendBuf, 11);
+ 	    op[11] = '\0';
+            if(strcmp(op, "sendmessage") == 0)
 	    {
-		memset(sendBuf,0,sizeof(sendBuf));
-	        gets(sendBuf);
-	        printf("%s\n", sendBuf);
-	        struct user use;
+		memset(sendmessage, 0, sizeof(sendmessage));
+		strcpy(sendmessage, sendBuf+11);
+	      //  printf("%s\n", sendmessage);
+	        
    	        use.typ = 5;
-	        strcpy(use.name, usename);
+ 		memset(use.name, 0, sizeof(use.name));
+        	memset(use.friendname, 0, sizeof(use.friendname));
+		memset(use.sentence, 0, sizeof(use.sentence));	        
+		strcpy(use.name, usename);
    	        strcpy(use.friendname, friendname);
-		strcpy(use.sentence, sendBuf);
+		strcpy(use.sentence, sendmessage);
+
       	        if(send(sockfd,(char *)&use,sizeof(struct user),0)==-1)
   	        {
         		printf(" chat fail to send datas.");
 	         	return;
     	        }
 	    	continue;
+	    }
+
+	    memset(op, 0, sizeof(op));
+	    strncpy(op, sendBuf, 4);
+ 	    op[4] = '\0';
+	    if(strcmp(op, "exit") == 0)
+	    {
+		use.typ = 5;
+ 		memset(use.name, 0, sizeof(use.name));
+		strcpy(use.name, "root");
+		if(send(sockfd,(char *)&use,sizeof(struct user),0)==-1)
+  	        {
+        		printf(" chat fail to send datas.");
+	         	return;
+    	        }
+		return;
 	    }
         }
     }
@@ -186,6 +219,11 @@ void chat(int sockfd, char* usename, char* friendname)
                 printf("Server maybe shutdown!");
                 break;
             }
+	    if(strcmp(use.name,"root") == 0)
+	    {
+		kill(pid, SIGKILL);
+		return;		
+	    }
             if(use.typ == 5)
 	    {
 		printf("%s:%s\n", use.name, use.sentence);
@@ -196,20 +234,47 @@ void chat(int sockfd, char* usename, char* friendname)
         }
     }
     
+    return;
     
+}
+
+void recvmessage(int sockfd, char* username)
+{
+    char revBuf[40960];
+    memset(revBuf, 0, sizeof(revBuf));
+    struct user use;
+    use.typ = 7;
+    memset(use.name, 0, sizeof(use.name));
+    strcpy(use.name, username);
+    if(send(sockfd,(char *)&use,sizeof(struct user),0)==-1)
+    {
+        printf(" revm fail to send datas.");
+	return;
+    }
+
+    if(recv(sockfd,revBuf,sizeof(revBuf),0)==-1)
+    {
+        printf("revm fail to receive datas.");
+	return;
+    }
+    printf("%s\n", revBuf);
+
+    return;
 }
 
 void chatroom(int sockfd, char* usename)
 {
-    printf("*******chatroom********\n");
-    printf("1. add\n");
-    printf("2. ls\n");
-    printf("3. chat\n");
-    printf("4. profile\n");
-    printf("5. sync\n");
-    printf("6. exit\n");
+    
     while(1)
     {
+	printf("*******chatroom********\n");
+    	printf("1. add\n");
+   	printf("2. ls\n");
+   	printf("3. chat\n");
+    	printf("4. recvmessage\n");
+    	printf("5. profile\n");
+   	printf("6. sync\n");
+    	printf("7. exit\n");
         int n = 0;
         printf("input:");
         scanf("%d",&n);
@@ -243,72 +308,22 @@ void chatroom(int sockfd, char* usename)
 	   chat(sockfd, usename, name);	
 	   continue;
 	}
-	if(n == 6)
+        if(n == 4)
+	{
+	    recvmessage(sockfd, usename);
+	    continue;
+	}
+	if(n == 5)
+	{
+	    printf("current user:%s\n", use.name);
+	}
+	if(n == 7)
 	    break;
     }
     return;
     
 }
 
-/*void chatroom()
-{
-
-    //发送用户名和密码过去
-    if(send(sockfd,(char *)&use,sizeof(struct user),0)==-1)
-    {
-        perror("fail to send datas.");
-        exit(-1);
-    }
-    if((recvSize=recv(sockfd,recvBuf,MAX_BUF,0)==-1))
-    {
-        perror("fail to receive datas.");
-        exit(-1);
-    }
-    //printf("Server:%s\n",recvBuf);
-    if(strcmp(recvBuf,"no")==0)
-    {
-        perror("密码或者用户名错误");
-        exit(-1);
-    }
-
-
-    //send-recv
-    if((pid=fork())<0)
-    {
-        perror("fork error\n");
-    }
-    else if(pid==0)
-    {
-        while(1)
-        {
-	    printf("%s:",use.name);
-            fgets(sendBuf,MAX_BUF,stdin);
-            if(send(sockfd,sendBuf,strlen(sendBuf),0)==-1)
-            {
-                perror("fail to receive datas.");
-            }
-           
-	    memset(sendBuf,0,sizeof(sendBuf));
-        }
-    }
-    else
-    {
-        while(1)
-        {
-            if((recvSize=recv(sockfd,recvBuf,MAX_BUF,0)==-1))
-            {
-                printf("Server maybe shutdown!");
-                break;
-            }
-            printf("others:%s\n",recvBuf);
-	    
-            memset(recvBuf,0,sizeof(recvBuf));
-        }
-       // kill(pid,SIGKILL);
-    }
-
-    close(sockfd);
-}*/
 
 int main(int argc,char *argv[])
 {
