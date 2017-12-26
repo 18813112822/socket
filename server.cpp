@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <string.h>
 #include <netdb.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -13,6 +14,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <mysql.h>
+#include <unistd.h>
+#include <dirent.h>
 
 #define SERVER_PORT 12138
 #define BACKLOG 20
@@ -596,6 +599,10 @@ int main(int argc,char *argv[])
 
     FILE *fp;
 	char filename[100];
+	char fn[100];
+	struct dirent* ent = NULL;
+	DIR* p = NULL;
+	int count = 0;
 
     struct sockaddr_in serverSockaddr,clientSockaddr;
     char sendm[40960];
@@ -755,6 +762,7 @@ int main(int argc,char *argv[])
 								  strcat(listname, "\n");
 								  create(use.name);
 				 				  createcache(use.name);
+								  mkdir(use.name, S_IRWXU);
 			 	 				  if(regist(use.name, use.pwd) == 0)
 									  strcpy(sendBuf, "yes");
 			 					  else
@@ -932,7 +940,112 @@ int main(int argc,char *argv[])
   										} 
 				    				}
 								}
+								
+								if(flag == 0)
+								{
+									memset(filename, 0, sizeof(filename));
+									getcwd(filename, 100);
+									strcat(filename, "/");
+									strcat(filename, use.friendname);
+									strcat(filename, "/");
+									strcat(filename, use.sentence);
+									//printf("%s\n", filename);
+									fp = fopen(filename, "w+");
+									if(fp == NULL)
+									{
+										printf("the file is not exit\n");
+										continue;
+									}	
+									int length = 0; 
+  									while((length = recv(fd_A[i], recvBuf, sizeof(recvBuf), 0)) > 0) 
+ 									{ 
+	             						if(strcmp(recvBuf, "root") == 0)	
+											break;
+		    							//printf("%s", recvBuf);
+    		    						if(fwrite(recvBuf, sizeof(char), sizeof(recvBuf), fp) < length) 
+   		    							{ 
+      										printf("File:\t%s Write Failed\n", filename); 
+     										break; 
+    		    						} 
+    		    						memset(recvBuf, 0, sizeof(recvBuf));
+  									} 
+									fclose(fp);	
+								}
   								
+								continue;
+							}
+							
+							if(use.typ == 10)
+							{	
+								memset(filename, 0, sizeof(filename));
+								getcwd(filename, 100);
+								strcat(filename, "/");
+								strcat(filename, use.name);
+								if((p = opendir(filename)) == NULL)
+								{
+									printf("erro\n");
+									return 0;
+								}
+								count = 0;
+								while((ent = readdir(p)) != NULL)
+								{
+									count++;
+									if(strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0)
+									{
+										continue;										
+									}
+									if(count > 2)
+									{
+										memset(use.name, 0, sizeof(use.name));
+										memset(use.sentence, 0, sizeof(use.sentence));
+										strcpy(use.name, "name");
+										strcpy(use.sentence, ent->d_name);
+										if(send(fd_A[i], (char*)&use, sizeof(struct user), 0) < 0) 
+        	  					   		{ 
+          									printf("Send File:%s Failed./n", filename); 
+          									break; 
+        	  						  	} 
+									}
+									memset(fn, 0, sizeof(fn));
+									strcpy(fn, filename);
+									strcat(fn, "/");
+									strcat(fn, ent->d_name);
+									//printf("%s\n", fn);
+									fp = fopen(fn, "r+");
+									if(fp == NULL)
+									{
+										printf("the file is not exit\n");
+										continue;
+									}
+									memset(sendBuf, 0, sizeof(sendBuf)); 
+      								int length = 0;  
+      								while((length = fread(sendBuf, sizeof(char), sizeof(sendBuf), fp)) > 0) 
+      								{ 
+		   								 //printf("%s",sendBuf);
+       	 	   							 if(send(fd_A[i], sendBuf, sizeof(sendBuf), 0) < 0) 
+        	   							 { 
+          										printf("Send File:%s Failed./n", filename); 
+          										break; 
+        	    							} 
+        	   							 memset(sendBuf, 0, sizeof(sendBuf));  
+									}
+									strcpy(sendBuf,"root");
+									if(send(fd_A[i], sendBuf, sizeof(sendBuf), 0) < 0) 
+        	  					    { 
+          								printf("Send File:%s Failed./n", filename); 
+          								break;        	  	 
+									}
+									fclose(fp);
+									remove(fn);
+								}
+								memset(use.name, 0, sizeof(use.name));
+								strcpy(use.name, "root");
+								if(send(fd_A[i], (char*)&use, sizeof(struct user), 0) < 0) 
+        	  					    { 
+          								printf("Send File:%s Failed./n", filename); 
+          								break; 
+        	  						  } 
+								closedir(p);
 								continue;
 							}
 

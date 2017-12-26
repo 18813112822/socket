@@ -386,6 +386,67 @@ void sync(int sockfd, char* username)
     return;
 }
 
+void recvfile(int sockfd, char* username)
+{
+    FILE* stream;
+    char recvBuf[MAX_BUF];
+    char filename[100];
+    memset(recvBuf, 0, sizeof(recvBuf));
+    
+
+    struct user use;
+    use.typ = 10;
+    memset(use.name, 0, sizeof(use.name));
+
+    strcpy(use.name, username);
+
+    if(send(sockfd,(char *)&use,sizeof(struct user),0)==-1)
+    {
+        printf(" sync fail to send datas.");
+	return;
+    }
+
+    while(1)
+    {
+	memset(use.name, 0, sizeof(use.name));
+	if(recv(sockfd,(char *)&use,sizeof(struct user),0)==-1)
+   	{
+        	printf(" sync fail to send datas.");
+		return;
+    	}
+	if(strcmp(use.name,"root") == 0)
+		break;
+	memset(filename, 0, sizeof(filename));
+    	strcpy(filename, "/home/ubuntu/Downloads/");
+   	strcat(filename, use.sentence);
+	stream = fopen(filename, "w+");
+	if(NULL == stream) 
+	{ 
+        	printf("File:\t%s Can Not Open To Write\n", filename); 
+       		exit(1); 
+    	}
+	
+	int length = 0; 
+    	while((length = recv(sockfd, recvBuf, sizeof(recvBuf), 0)) > 0) 
+   	{ 
+        	if(strcmp(recvBuf, "root") == 0)	
+		    break;
+        	//printf("%s", recvBuf);
+       		if(fwrite(recvBuf, sizeof(char), sizeof(recvBuf), stream) < length) 
+        	{ 
+     		    printf("File:\t%s Write Failed\n", filename); 
+     		    break; 
+        	} 
+    		memset(recvBuf, 0, sizeof(recvBuf));
+    	} 
+    	fclose(stream);
+    }
+    
+    printf("recv files sucess\n");
+    
+    	
+}
+
 void chatroom(int sockfd, char* usename)
 {
     
@@ -396,9 +457,10 @@ void chatroom(int sockfd, char* usename)
    	printf("2. ls\n");
    	printf("3. chat\n");
     	printf("4. recvmessage\n");
-    	printf("5. profile\n");
-   	printf("6. sync\n");
-    	printf("7. exit\n");
+	printf("5. recvfile\n");
+    	printf("6. profile\n");
+   	printf("7. sync\n");
+    	printf("8. exit\n");
         int n = 0;
         printf("input:");
         scanf("%d",&n);
@@ -439,17 +501,22 @@ void chatroom(int sockfd, char* usename)
 	}
 	if(n == 5)
 	{
+	    recvfile(sockfd, usename);
+	    continue;
+	}
+	if(n == 6)
+	{
 	    printf("current user:%s\n", usename);
 	    printf("friendlist\n");
 	    printf("%s", friendlist);
 	    continue;
 	}
-	if(n == 6)
+	if(n == 7)
 	{
 	    sync(sockfd, usename);
 	    continue;
 	}
-	if(n == 7)
+	if(n == 8)
 	    break;
     }
     return;
@@ -551,5 +618,6 @@ int main(int argc,char *argv[])
 	else
 	    break;
     }
+    close(sockfd);
     return 0;
 }
