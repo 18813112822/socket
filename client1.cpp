@@ -215,15 +215,26 @@ void chat(int sockfd, char* usename, char* friendname)
 		use.typ = 9;
  		memset(use.name, 0, sizeof(use.name));
 		memset(filename, 0, sizeof(filename));
+		memset(use.friendname, 0, sizeof(use.friendname));
+		memset(use.sentence, 0, sizeof(use.sentence));
 
 		strcpy(use.name, usename);
+		strcpy(use.friendname, friendname);	
+		strcpy(filename, sendBuf+9);
+		int k = 0;		
+		for(k = sizeof(filename); k >= 0; k--)
+			if(filename[k] == '/')
+				break;
+		strcpy(use.sentence, filename+k+1);
+	
 		if(send(sockfd,(char *)&use,sizeof(struct user),0)==-1)
   	        {
         		printf(" chat fail to send datas.");
 	         	return;
     	        }
 
-		strcpy(filename, sendBuf+9);
+		
+		
 		if((stream = fopen(filename, "r")) == NULL)
 		{
 		    printf("the file is not exit\n");
@@ -232,15 +243,23 @@ void chat(int sockfd, char* usename, char* friendname)
 		
 		memset(sendBuf, 0, sizeof(sendBuf)); 
       		int length = 0;  
-      		while((length = fread(buffer, sizeof(char), sizeof(sendBuf), fp)) > 0) 
+      		while((length = fread(sendBuf, sizeof(char), sizeof(sendBuf), stream)) > 0) 
       		{ 
-       	 	    if(send(sockfd, buffer, length, 0) < 0) 
+		   // printf("%s",sendBuf);
+       	 	    if(send(sockfd, sendBuf, sizeof(sendBuf), 0) < 0) 
         	    { 
           		printf("Send File:%s Failed./n", filename); 
           		break; 
         	    } 
         	    memset(sendBuf, 0, sizeof(sendBuf));  
 		}
+		strcpy(sendBuf,"root");
+		if(send(sockfd, sendBuf, sizeof(sendBuf), 0) < 0) 
+        	    { 
+          		printf("Send File:%s Failed./n", filename); 
+          		break; 
+        	    } 
+		fclose(stream);
 		continue;
 	    }
 
@@ -257,6 +276,7 @@ void chat(int sockfd, char* usename, char* friendname)
         		printf(" chat fail to send datas.");
 	         	return;
     	        }
+		fclose(stream);
 		return;
 	    }
         }
@@ -266,7 +286,9 @@ void chat(int sockfd, char* usename, char* friendname)
         while(1)
         {
 	    struct user use;
+	    memset(recvBuf, 0, sizeof(recvBuf));
 	    memset(use.name,0,sizeof(use.name));
+	    memset(filename, 0, sizeof(filename));
 	    memset(use.sentence,0,sizeof(use.sentence));
             if(recv(sockfd,(char *)&use,sizeof(struct user),0)==-1)
             {
@@ -284,7 +306,33 @@ void chat(int sockfd, char* usename, char* friendname)
 		continue;
 	    }
 	    
-            
+            if(use.typ == 9)
+	    {
+		strcpy(filename, "/home/ubuntu/Downloads/");
+	  	strcat(filename, use.sentence);
+		printf("recv a file form %s\n", use.name);
+		stream = fopen(filename, "w");
+		if(NULL == stream) 
+  		{ 
+    		    printf("File:\t%s Can Not Open To Write\n", filename); 
+    		    exit(1); 
+  		}
+		int length = 0; 
+  		while((length = recv(sockfd, recvBuf, sizeof(recvBuf), 0)) > 0) 
+ 		{ 
+	             if(strcmp(recvBuf, "root") == 0)	
+			break;
+		    //printf("%s", recvBuf);
+    		    if(fwrite(recvBuf, sizeof(char), sizeof(recvBuf), stream) < length) 
+   		    { 
+      			printf("File:\t%s Write Failed\n", filename); 
+     			break; 
+    		    } 
+    		    memset(recvBuf, 0, sizeof(recvBuf));
+  		} 
+		fclose(stream);	
+		continue;	    
+	    }
         }
     }
     

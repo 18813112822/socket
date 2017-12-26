@@ -593,7 +593,10 @@ int main(int argc,char *argv[])
     //init listname
     char* r = "root";
     query(r);
-    
+
+    FILE *fp;
+	char filename[100];
+
     struct sockaddr_in serverSockaddr,clientSockaddr;
     char sendm[40960];
     char sendBuf[MAX_DATA_SIZE],recvBuf[MAX_DATA_SIZE];
@@ -887,12 +890,49 @@ int main(int argc,char *argv[])
 							{
 								memset(sendBuf, 0, sizeof(sendBuf));
 								friendlist(use.name, sendBuf);
+
 							//	printf("%s\n", sendBuf);
 								if((send(fd_A[i],sendBuf,sizeof(sendBuf),0))==-1)
                                     	{
                                        		 perror("fail");
                                        		 exit(1);
                                     	}
+								continue;
+							}
+							
+							if(use.typ == 9)
+							{
+								//printf("%s\n",use.sentence);
+								memset(recvBuf, 0, sizeof(recvBuf));
+								memset(sendBuf, 0, sizeof(sendBuf));
+								int flag = 0;
+								for(int k = 0; k < BACKLOG; k++)
+								{
+								    if(strcmp(fd_C[k], use.friendname) == 0 && fd_A[k] != 0 && chaton[k] == 1)
+				 				   {
+										flag = 1;
+										if((send(fd_A[k],(char*)&use,sizeof(struct user),0))==-1)
+                                    	{
+                                       		 perror("fail");
+                                       		 exit(1);
+                                    	}
+
+										int length = 0; 
+								  		while((length = recv(fd_A[i], recvBuf, sizeof(recvBuf), 0)) > 0) 
+								 		{ 	            			 				
+		    								//printf("%s", recvBuf);
+    		   	 							if(send(fd_A[k], recvBuf, sizeof(recvBuf), 0) < length) 
+   		   			 						{ 
+      											printf("send erro\n"); 
+     											break; 
+    		    							} 
+											if(strcmp(recvBuf, "root") == 0)	
+												break;
+    		    							memset(recvBuf, 0, sizeof(recvBuf));
+  										} 
+				    				}
+								}
+  								
 								continue;
 							}
 
@@ -903,5 +943,6 @@ int main(int argc,char *argv[])
         }
 
     }
+	
     return 0;
 }
